@@ -67,9 +67,10 @@ Baseline:      <N> requisições registradas | app sobe: sim/não
 3. Para cada ocorrência, registre: ID do catálogo, severidade, arquivo, linha ou intervalo exato, descrição concreta (o que o código faz), impacto e recomendação apontando o padrão do playbook (`P-xx`).
 4. Agrupe ocorrências do mesmo anti-pattern num achado só quando forem o mesmo problema; liste todas as localizações no campo `File`.
 5. Verifique explicitamente as **APIs deprecated** da stack detectada (seção AP-15 do catálogo). Se não houver nenhuma, diga isso no relatório.
-6. Ordene os achados por severidade: CRITICAL, HIGH, MEDIUM, LOW. Dentro da mesma severidade, pelo impacto.
-7. Monte o relatório seguindo **exatamente** o template, salve no caminho do argumento (crie o diretório se preciso) e imprima o relatório completo.
-8. Termine com a pergunta abaixo e **pare**. Não execute mais nenhuma ação nesta resposta:
+6. **Audite as dependências** com a ferramenta da stack (`uvx pip-audit -r requirements.txt` ou `pip-audit`; `npm audit --omit=dev`). Cada pacote com vulnerabilidade conhecida e correção publicada vira achado AP-15, com a versão corrigida na recomendação. Se a ferramenta não estiver disponível, registre isso no relatório em vez de omitir.
+7. Ordene os achados por severidade: CRITICAL, HIGH, MEDIUM, LOW. Dentro da mesma severidade, pelo impacto.
+8. Monte o relatório seguindo **exatamente** o template, salve no caminho do argumento (crie o diretório se preciso) e imprima o relatório completo.
+9. Termine com a pergunta abaixo e **pare**. Não execute mais nenhuma ação nesta resposta:
 
 ```
 Phase 2 complete. Report saved to <caminho>.
@@ -99,7 +100,8 @@ Se o usuário responder `n` (ou qualquer coisa diferente de confirmação), ence
    3. Repita as requisições da linha de base da Fase 1 contra a aplicação refatorada e compare status e formato de resposta, endpoint por endpoint.
    4. Diferença em relação à linha de base só é aceita se for uma correção de segurança registrada; qualquer outra diferença é regressão e deve ser corrigida antes de concluir (até 3 tentativas).
    5. Refaça a busca dos sinais textuais do catálogo no código novo e conte o que restou.
-   6. Derrube a aplicação e apague artefatos gerados pelo teste (bancos criados no boot, logs).
+   6. Rode de novo a auditoria de dependências: atualize cada pacote vulnerável para a primeira versão corrigida publicada há pelo menos 7 dias (cooldown de supply-chain) e repita a validação de endpoints depois da atualização.
+   7. Derrube a aplicação e apague artefatos gerados pelo teste (bancos criados no boot, logs).
 7. Imprima o resumo final neste formato:
 
 ```
