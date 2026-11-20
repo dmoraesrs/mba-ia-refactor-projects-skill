@@ -134,7 +134,7 @@ Recommendation: Remover os imports mortos (P-17).
 ## Deprecated APIs
 | Local | API | Equivalente moderno |
 |-------|-----|---------------------|
-| — | Nenhuma API deprecated encontrada na stack detectada (busca por `utcnow(`, `query.get(`, `.query.`, `before_first_request`, `JSONEncoder`, `md5(` sem ocorrências). Auditoria de vulnerabilidade das dependências não executada: `pip-audit` não está instalado. | — |
+| (nenhum) | Nenhuma API deprecated encontrada na stack detectada (busca por `utcnow(`, `query.get(`, `.query.`, `before_first_request`, `JSONEncoder`, `md5(` sem ocorrências). Auditoria de vulnerabilidade das dependências não executada: `pip-audit` não está instalado. | — |
 
 ## Endpoints mapped (baseline)
 | Method | Path | Handler | Baseline status |
