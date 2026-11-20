@@ -1,34 +1,74 @@
+"""Entry point / composition root: cria a app, injeta dependências e registra rotas."""
+
+import logging
+from pathlib import Path
+
+from dotenv import load_dotenv
 from flask import Flask
 from flask_cors import CORS
-from database import db
-from routes.task_routes import task_bp
-from routes.user_routes import user_bp
-from routes.report_routes import report_bp
-import os, sys, json, datetime
 
-app = Flask(__name__)
+from src.config.settings import load_settings
+from src.controllers.category_controller import CategoryController
+from src.controllers.health_controller import HealthController
+from src.controllers.report_controller import ReportController
+from src.controllers.task_controller import TaskController
+from src.controllers.user_controller import UserController
+from src.database import db, init_database
+from src.middlewares.auth import Authenticator
+from src.middlewares.error_handler import register_error_handlers
+from src.routes import register_routes
+from src.security import TokenSigner
+from src.services.auth_service import AuthService
+from src.services.category_service import CategoryService
+from src.services.notification_service import LogEmailSender, NotificationService, SmtpEmailSender
+from src.services.report_service import ReportService
+from src.services.task_service import TaskService
+from src.services.user_service import UserService
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tasks.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'super-secret-key-123'
+PROJECT_DIR = Path(__file__).resolve().parent
+logger = logging.getLogger(__name__)
 
-CORS(app)
-db.init_app(app)
 
-app.register_blueprint(task_bp)
-app.register_blueprint(user_bp)
-app.register_blueprint(report_bp)
+def create_app(settings=None):
+    if settings is None:
+        load_dotenv(PROJECT_DIR / ".env")  # só o .env do projeto; variáveis já exportadas têm prioridade
+        settings = load_settings()
 
-@app.route('/health')
-def health():
-    return {'status': 'ok', 'timestamp': str(datetime.datetime.now())}
+    logging.basicConfig(level=settings.log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    for name in settings.generated:
+        logger.warning("%s não definido: usando valor aleatório válido só para este processo", name)
 
-@app.route('/')
-def index():
-    return {'message': 'Task Manager API', 'version': '1.0'}
+    app = Flask(__name__)
+    app.config.update(
+        SECRET_KEY=settings.secret_key,
+        SQLALCHEMY_DATABASE_URI=settings.database_url,
+        SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        DEBUG=settings.debug,
+    )
+    CORS(app, origins=settings.cors_origins)
+    init_database(app)
 
-with app.app_context():
-    db.create_all()
+    email_sender = SmtpEmailSender(settings.smtp) if settings.smtp.enabled else LogEmailSender()
+    notification_service = NotificationService(email_sender)
+    auth_service = AuthService(db.session, TokenSigner(settings.secret_key, settings.token_max_age))
+    report_service = ReportService()
+    authenticator = Authenticator(auth_service)
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    controllers = {
+        "health": HealthController(),
+        "task": TaskController(TaskService(db.session, notification_service), report_service),
+        "user": UserController(UserService(db.session), auth_service, authenticator),
+        "category": CategoryController(CategoryService(db.session)),
+        "report": ReportController(report_service),
+    }
+    register_routes(app, controllers, authenticator)
+    register_error_handlers(app)
+    return app
+
+
+if __name__ == "__main__":
+    load_dotenv(PROJECT_DIR / ".env")
+    settings = load_settings()
+    application = create_app(settings)
+    logger.info("Servidor iniciado em http://%s:%s", settings.host, settings.port)
+    application.run(host=settings.host, port=settings.port, debug=settings.debug, load_dotenv=False)
